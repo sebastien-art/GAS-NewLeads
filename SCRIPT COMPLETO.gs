@@ -15,24 +15,6 @@ const ENFORCE_ALIAS = true;
 const INCLUDE_NAME_IN_GREETING = true;
 let DRY_RUN = false;  // producción
 
-/********************* MENÚ EN LA HOJA *********************/
-function onOpen() {
-  const ui = SpreadsheetApp.getUi();
-
-  ui.createMenu("Leads")
-    .addItem("Procesar nuevos ahora", "processNewLeads")
-    .addItem((DRY_RUN ? "Activar envío" : "Desactivar envío"), "toggleSendMode_")
-    .addSeparator()
-    .addItem("Procesar a Inactivos", "procesarMovimientos")
-    .addItem("Aplicar fórmulas y referencias (Selección segura)", "aplicarFormulasYRefs_SeleccionSegura")
-    .addToUi();
-}
-
-function toggleSendMode_(){
-  DRY_RUN = !DRY_RUN;
-  SpreadsheetApp.getActive().toast("Envío automático: " + (DRY_RUN ? "DESACTIVADO" : "ACTIVADO"));
-}
-
 /********************* FUNCIÓN DE VERIFICACIÓN DE ALIAS *********************/
 function checkAliasReady_() {
   const aliases = GmailApp.getAliases();
@@ -62,7 +44,7 @@ function processNewLeads(){
     '-label:' + EXCLUDE_TEST_LABEL + ' ' +
     'newer_than:30d ' +
     '(' +
-      'from:@usuarios.inmuebles24.com OR from:@usuarios.vivanuncios.com.mx OR from:notificaciones@propiedades.com OR from:@inbox.easybroker.com' +
+      'from:@usuarios.inmuebles24.com OR from:@usuarios.vivanuncios.com.mx OR from:notificaciones@propiedades.com OR from:@inbox.easybroker.com OR from:solicitudes@proppit.com' +
     ')';
 
   const threads = GmailApp.search(SEARCH_QUERY, 0, 150);
@@ -105,7 +87,10 @@ function processNewLeads(){
     const received = lastDate;
     const receivedPlus = addDays_(received, 3);
 
-    const name     = extractName_(bodyText, bodyHtml) || "";
+    const name     = prov === "proppit"
+      ? extractName_Proppit_(bodyText, bodyHtml)
+      : extractName_(bodyText, bodyHtml);
+
     const emailTo  = extractEmail_(bodyText, bodyHtml) || "";
     const phoneStr = extractPhonesSmart_(bodyText, bodyHtml).join(" / ");
     const link     = getListingLinkByProvider_(prov, bodyHtml, bodyText) || "";
@@ -160,6 +145,7 @@ function detectProviderQuick_(from, subject){
   if (/@usuarios\.inmuebles24\.com/.test(from))     return "i24";
   if (/@usuarios\.vivanuncios\.com\.mx/.test(from)) return "vivanuncios";
   if (/notificaciones@propiedades\.com/.test(from)) return "propiedades";
+  if (/solicitudes@proppit\.com/.test(from)) return "proppit";
   if (/@inbox\.easybroker\.com/.test(from)){
     if (/mercado libre/i.test(subject)) return "mercado_libre";
     if (/bolsa/i.test(subject)) return "easy_bolsa";
@@ -172,6 +158,7 @@ function detectProviderFromText_(content){
   if (h.includes("inmuebles24")) return "i24";
   if (h.includes("vivanuncios")) return "vivanuncios";
   if (h.includes("propiedades.com")) return "propiedades";
+  if (h.includes("proppit")) return "proppit";
   if (h.includes("easybroker")){
     if (h.includes("mercado libre")) return "mercado_libre";
     if (h.includes("bolsa")) return "easy_bolsa";
@@ -183,6 +170,7 @@ function sourceLabel_(prov){
     case "i24": return "Inmuebles24";
     case "vivanuncios": return "VivaAnuncios";
     case "propiedades": return "Propiedades.com";
+    case "proppit": return "Proppit";
     case "mercado_libre": return "Mercado Libre";
     case "easy_bolsa": return "Bolsa EasyBroker";
     case "easy_telefono": return "EasyBroker (Teléfono)";
@@ -194,6 +182,7 @@ function sourceLabel_(prov){
 function getListingLinkByProvider_(prov, html, text){
   if (prov === "i24" || prov === "vivanuncios") return getListingLink_I24_(html, text);
   if (prov === "propiedades") return getListingLink_Propiedades_(html);
+  if (prov === "proppit") return getListingLink_Proppit_(html, text);
   if (prov === "easy_bolsa" || prov === "mercado_libre" || prov === "easy_telefono") return getListingLink_EasyBroker_(html, text);
   return "";
 }
@@ -219,6 +208,13 @@ function getListingLink_Propiedades_(html){
     if (/^mailto:/i.test(url)) continue;
     if (/^https?:\/\//i.test(url) && url.includes("propiedades.com")) return url;
   }
+  return "";
+}
+function getListingLink_Proppit_(html, text){
+  const h = html || "";
+  const t = text || "";
+  const ebCode = extractEasyBrokerCode_(h) || extractEasyBrokerCode_(t);
+  if (ebCode) return "https://www.easybroker.com/property/" + ebCode;
   return "";
 }
 function getListingLink_EasyBroker_(html, text){
@@ -273,6 +269,12 @@ function extractName_(bodyText, bodyHtml){
   if (m) return sanitizeName_(m[1]);
   return "";
 }
+function extractName_Proppit_(bodyText, bodyHtml){
+  const plain = (bodyText || "") + "\n" + stripHtml_(bodyHtml || "");
+  const m = plain.match(/Lead Plus\s+([\w\sáéíóúñÁÉÍÓÚÑ.-]+)\s+México/i);
+  if (m) return sanitizeName_(m[1]);
+  return "";
+}
 function sanitizeName_(s){ return String(s || "").replace(/\s+/g," ").replace(/[<>]/g,"").trim(); }
 
 function extractEmail_(bodyText, bodyHtml){
@@ -286,7 +288,8 @@ function isSystemEmail_(e){
   return /@usuarios\.inmuebles24\.com$/i.test(e) ||
          /@usuarios\.vivanuncios\.com\.mx$/i.test(e) ||
          /@propiedades\.com$/i.test(e) ||
-         /@easybroker\.com$/i.test(e);
+         /@easybroker\.com$/i.test(e) ||
+         /@proppit\.com$/i.test(e);
 }
 
 function extractPhonesSmart_(bodyText, bodyHtml){
@@ -335,7 +338,7 @@ function sendAutoReply_(emailTo, name, hasAlias){
 function _norm_(s){
   return String(s||"")
     .toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')  // quita acentos
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
     .trim();
 }
 
@@ -355,7 +358,7 @@ function copiarFormulasFormatosYValidaciones_(hoja, filaInicio, numFilas, column
   if (!columnas.length) return;
   for (let i = 0; i < numFilas; i++) {
     const r = filaInicio + i;
-    const base = 2;  // ✅ siempre copia desde la fila 2
+    const base = 2;
     hoja.getRange(base, 1, 1, hoja.getLastColumn())
         .copyTo(hoja.getRange(r, 1, 1, hoja.getLastColumn()), SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
     hoja.getRange(base, 1, 1, hoja.getLastColumn())
@@ -367,9 +370,9 @@ function copiarFormulasFormatosYValidaciones_(hoja, filaInicio, numFilas, column
   }
 }
 
-/*********** AUTO-MOVER CON MENÚ ***********/ 
-const MASTER_SHEET_NAME   = "Sheet1";     
-const INACTIVE_SHEET_NAME = "Inactivos";  
+/*********** AUTO-MOVER CON MENÚ ***********/
+const MASTER_SHEET_NAME   = "Sheet1";
+const INACTIVE_SHEET_NAME = "Inactivos";
 
 function procesarMovimientos() {
   const ss  = SpreadsheetApp.getActiveSpreadsheet();
@@ -408,14 +411,22 @@ function mover_(fromSh, toSh, valoresPermitidos) {
 
   rowsToMove.sort((a,b) => b - a);
 
-  rowsToMove.forEach(r => {
-    const lastColFrom = fromSh.getLastColumn();
-    const lastColTo   = toSh.getLastColumn();
-    const cols = Math.min(lastColFrom, lastColTo);
-    const nextRow = toSh.getLastRow() + 1;
+  const lastColFrom = fromSh.getLastColumn();
 
-    fromSh.getRange(r, 1, 1, cols).copyTo(
-      toSh.getRange(nextRow, 1, 1, cols),
+  if (toSh.getMaxColumns() < lastColFrom) {
+    toSh.insertColumnsAfter(toSh.getMaxColumns(), lastColFrom - toSh.getMaxColumns());
+  }
+
+  rowsToMove.forEach(r => {
+    const currentLastRow = toSh.getLastRow();
+    const nextRow = Math.max(currentLastRow + 1, 1);
+
+    if (toSh.getMaxRows() < nextRow) {
+      toSh.insertRowsAfter(toSh.getMaxRows(), 1);
+    }
+
+    fromSh.getRange(r, 1, 1, lastColFrom).copyTo(
+      toSh.getRange(nextRow, 1, 1, lastColFrom),
       SpreadsheetApp.CopyPasteType.PASTE_NORMAL,
       false
     );
@@ -454,7 +465,7 @@ function aplicarFormulasYRefs_SeleccionSegura() {
     const r = filaInicio + i;
     if (r <= 1) continue;
 
-    const filaBase = 2;  // ✅ siempre copiar desde fila 2
+    const filaBase = 2;
 
     hoja.getRange(filaBase, 1, 1, hoja.getLastColumn()).copyTo(
       hoja.getRange(r, 1, 1, hoja.getLastColumn()),
