@@ -313,17 +313,41 @@ function stripHtml_(html){
 /********************* CORREO AUTOMÁTICO *********************/
 function sendAutoReply_(emailTo, name, hasAlias){
   const subject  = "Solicitud recibida para bodegas y terrenos industriales | Industrial Estate México";
+  
+  // Usamos la variable 'nombre' que ya tenías declarada
   const nombre = (INCLUDE_NAME_IN_GREETING && name) ? " " + sanitizeName_(name) : "";
+  
   const htmlBody =
-    `<p>Hola${nombre},</p>
-<p>Recibimos tu solicitud relacionada con una nave industrial publicada.</p>
-<p>En <strong>Industrial Estate Mexico</strong> tenemos más de 1,000 propiedades industriales disponibles. Si puedes indicarme ubicación, superficie y tiempos estimados, te enviaré las opciones más relevantes.</p>
-<p>Visita nuestros sitios:</p>
-<ul>
-<li><a href="https://industrialestatemexico.com">industrialestatemexico.com</a></li>
-<li><a href="https://www.tierraindustrial.mx/">tierraindustrial.mx</a></li>
-</ul>
-<p>Saludos,<br><strong>Sebastián Dérieux</strong><br>Industrial Estate Mexico</p>`;
+    `<div style="font-family: Arial, sans-serif; font-size: 15px; color: #222222; line-height: 1.6; max-width: 580px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff;">
+
+      <p style="margin-top: 0;">Hola ${nombre},</p>
+
+      <p>Recibimos tu solicitud relacionada con una nave industrial en renta/venta publicada de nuestro catálogo.</p>
+
+      <p>En <strong>Industrial Estate Mexico</strong> tenemos más de 1,000 propiedades industriales disponibles. Si puedes indicarme ubicación, superficie y tiempos estimados, te enviaré las opciones más relevantes.</p>
+
+      <div style="background-color: #f4fdf7; border-left: 4px solid #25D366; padding: 12px 16px; margin: 20px 0; border-radius: 4px;">
+        <p style="margin: 0;">&#128172; <strong>¿Prefieres atención inmediata por llamada o WhatsApp?</strong><br>
+        Puedes contactarnos directamente al: <a href="https://wa.me/525528560255" target="_blank" style="color: #1e7e34; font-weight: bold; text-decoration: underline;">+52 55 2856 0255</a></p>
+      </div>
+
+      <p style="margin: 0; line-height: 1.4;">
+        <strong>Sebastián Dérieux</strong><br>
+        <span style="color: #555555; font-size: 13px;">CEO</span><br>
+        <span style="color: #0056b3; font-weight: bold;">Industrial Estate Mexico</span>
+      </p>
+
+      <hr style="border: none; border-top: 1px solid #eeeeee; margin: 20px 0 15px 0;" />
+
+      <p style="margin-bottom: 8px; font-size: 14px; color: #555555;">Visita nuestros sitios web:</p>
+      <ul style="margin-top: 0; padding-left: 20px; font-size: 14px;">
+        <li style="margin-bottom: 4px;"><a href="https://industrialestatemexico.com" style="color: #0056b3; text-decoration: none;">industrialestatemexico.com</a></li>
+        <li><a href="https://www.tierraindustrial.mx/" style="color: #0056b3; text-decoration: none;">tierraindustrial.mx</a></li>
+      </ul>
+
+    </div>`;
+
+
 
   const opts = {
     htmlBody: htmlBody,
